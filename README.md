@@ -6,6 +6,8 @@ https://catalog.us-east-1.prod.workshops.aws/workshops/f3a3e2bd-e1d5-49de-b8e6-d
 
 
 
+### 자리 앉은 순서대로 아래 링크를 사용합니다. 
+
 | table-number	| team-hash	 | team-hash-login |
 |---------------|------------|------------------|
 |1	|50f9-047a708154-71	|https://dashboard.eventengine.run/login?hash=50f9-047a708154-71
