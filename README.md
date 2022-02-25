@@ -38,3 +38,10 @@ https://catalog.us-east-1.prod.workshops.aws/workshops/f3a3e2bd-e1d5-49de-b8e6-d
 - downloadlink
 https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html
 - bin 64-bit x86:: https://the.earth.li/~sgtatham/putty/latest/w64/putty.exe
+
+
+#### 설문조사
+
+https://moaform.com/q/kNoUBB
+
+![img.png](qrcode-M0blK2.png)
