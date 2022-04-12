@@ -94,6 +94,6 @@ http://3.34.140.0:8080/
 
 ### 4. Model API TEST
 - 초록색 TAG layer를 클릭하면 입력창이 열립니다. 
-- 한글 문장을 입력하고 감정분석이 리턴되는 것을 확인합니다. 
+- 한글 문장을 입력하고 서버에 요청하면 감정 분류 정보를 응답하는 것을 확인합니다. 
 ![screenshot9](https://github.com/hyeonsangjeon/FSI-Gameday-General-Immersion-Day/blob/main/pic/step_8.png?raw=true)
 ![screenshot10](https://github.com/hyeonsangjeon/FSI-Gameday-General-Immersion-Day/blob/main/pic/step_77.png?raw=true)
