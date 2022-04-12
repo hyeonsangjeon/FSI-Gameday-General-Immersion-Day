@@ -1,0 +1,13 @@
+numpy
+IPython
+Flask==1.1.4
+Flask-RESTful==0.3.9
+flask_restplus
+pandas
+transformers==4.11.3
+sklearn
+matplotlib
+tqdm
+Werkzeug==0.16.1
+sentencepiece==0.1.96
+torch
