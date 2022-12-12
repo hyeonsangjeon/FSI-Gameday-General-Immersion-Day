@@ -86,10 +86,10 @@ chmod u+x ./*.sh
  - Tensorflow에 Transformer Bet모델을 로드한 다음, Flask Rest API서버가 기동됩니다. 로그를 확인한 뒤 APU를 브라우저에서 호출해봅니다.
 
 ```bash
-http://{퍼블릭 IPv4 주소}:80/
+http://{퍼블릭 IPv4 주소}:8080/
 
 # example: 
-http://3.34.140.0:80/
+http://3.34.140.0:8080/
 ```
 
 ### 4. Model API TEST
