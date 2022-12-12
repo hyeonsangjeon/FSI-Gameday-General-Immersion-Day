@@ -5,12 +5,6 @@ AWS FSI General Immersion Day for AIML
 https://catalog.us-east-1.prod.workshops.aws/workshops/f3a3e2bd-e1d5-49de-b8e6-dac361842e76/ko-KR/preparation-guide/20-event-engine
 
 
-
-### 실습 계정정보  
-#### - https://bit.ly/3Oaocx8
-- 실습 시작 후 오픈합니다. 
-
-
 #### PuTTY 다운로드
 윈도우 PC에서 핸즈온 과정 중 EC2 SSH 연동을 위해 사용합니다.
 - downloadlink
@@ -55,6 +49,11 @@ Amazon Linux 2 인스턴스를 시작하고, 분류 모델 API를 생성해봅�
 ![screenshot8](https://github.com/hyeonsangjeon/FSI-Gameday-General-Immersion-Day/blob/main/pic/step_7.png?raw=true)
 ```bash
 ssh -i "AWS-ImmersionDay.pem" ec2-user@{퍼블릭 IPv4 주소}
+```
+
+
+```bash
+sudo -i
 ```
 
 - 모델 실행 스크립트를 다운 받기 위해 EC2에 git을 설치합니다. 
