@@ -51,7 +51,7 @@ Amazon Linux 2 인스턴스를 시작하고, 분류 모델 API를 생성해봅�
 ssh -i "AWS-ImmersionDay.pem" ec2-user@{퍼블릭 IPv4 주소}
 ```
 
-
+- 계정을 root로 변경합니다.
 ```bash
 sudo -i
 ```
