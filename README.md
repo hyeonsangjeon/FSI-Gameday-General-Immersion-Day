@@ -44,7 +44,7 @@ Amazon Linux 2 인스턴스를 시작하고, 분류 모델 API를 생성해봅�
 - EC2인스턴스를 찾기 쉽도록 Tag이름(EC2's alias)을 기입합니다. 
 ![screenshot6](https://github.com/hyeonsangjeon/FSI-Gameday-General-Immersion-Day/blob/main/pic/step_4.png?raw=true)
 
-- 보안그룹에서 test할 API 의 TCP port를 바인딩 합니다. 80 포트를 사용하며, 소스는 '내 IP'를 선택하여 client PC에서만 접속 가능하도록 선택합니다. 
+- 보안그룹에서 test할 API 의 TCP port를 바인딩 합니다. 8080 포트를 사용하며, 소스는 '내 IP'를 선택하여 client PC에서만 접속 가능하도록 선택합니다. 
 ![screenshot7](https://github.com/hyeonsangjeon/FSI-Gameday-General-Immersion-Day/blob/main/pic/step_5.png?raw=true)
 
 - EC2 인스턴스에 접속하기 위한 RSA 키 페어는 GID 실습에서 사용한 기존 키페어를 선택합니다.   
