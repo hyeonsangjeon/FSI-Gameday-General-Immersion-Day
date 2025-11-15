@@ -1,5 +1,9 @@
 ####################################################################################################
 # Do not modify this code block #
+# Use legacy Keras for compatibility with transformers
+import os
+os.environ['TF_USE_LEGACY_KERAS'] = '1'
+
 # Import monitoring packages
 import logging
 import traceback
@@ -9,38 +13,76 @@ import json
 import werkzeug
 
 from werkzeug.wrappers import Response
-#pip  install --upgrade Flask==1.1.4
+#pip  install --upgrade Flask==2.2.5
 from flask import Flask, make_response, request, Response
 
-from flask_restplus import Api, Resource
+from flask_restx import Api, Resource
 from werkzeug.utils import cached_property
 ####################################################################################################
- #pip  install --upgrade Werkzeug==0.16.1
+ #pip  install --upgrade Werkzeug==2.2.3
 # Custom packages
 import numpy as np
 import sys
 import tensorflow as tf
 from logging.handlers import RotatingFileHandler
 import io
-from hsjeon_datascience_nlp import KoBertTokenizer, create_sentiment_bert,  mean_answer_label
+from hsjeon_datascience_nlp import create_sentiment_bert, mean_answer_label, KoBertTokenizer
 
 
-#strategy = tf.distribute.MirroredStrategy()
-strategy = tf.distribute.MirroredStrategy(devices=["/gpu:0"], cross_device_ops=tf.distribute.HierarchicalCopyAllReduce())
-filename = './data/fsi_comment_sentiment_model.h5'
+# Use CPU for local testing, GPU in production
+import os
+if os.path.exists('/app'):  # Running in Docker
+    strategy = tf.distribute.MirroredStrategy(devices=["/gpu:0"], cross_device_ops=tf.distribute.HierarchicalCopyAllReduce())
+else:  # Running locally
+    strategy = tf.distribute.get_strategy()  # Default strategy (CPU)
 
-with strategy.scope():
-    sentiment_model = create_sentiment_bert(learning_rate=0.000001, SEQ_LEN=32, DROPOUT=0.01, OUTPUT_CNT=1, loss_type='BinaryCrossentropy')
-    sentiment_model.load_weights(filename)
+# Model loading configuration
+# Set USE_LOCAL_MODEL=True to use local file, False to use HuggingFace (default)
+USE_LOCAL_MODEL = os.environ.get('USE_LOCAL_MODEL', 'False').lower() == 'true'
+LOCAL_MODEL_PATH = './data/fsi_comment_sentiment_model.h5'
+HUGGINGFACE_MODEL_REPO = 'HyeonSang/kobert-sentiment'
 
-tokenizer = KoBertTokenizer.from_pretrained('monologg/kobert')
+if USE_LOCAL_MODEL:
+    # Load from local file
+    print(f"Loading model from local file: {LOCAL_MODEL_PATH}")
+    with strategy.scope():
+        sentiment_model = create_sentiment_bert(learning_rate=0.000001, SEQ_LEN=32, DROPOUT=0.01, OUTPUT_CNT=1, loss_type='BinaryCrossentropy')
+        sentiment_model.load_weights(LOCAL_MODEL_PATH)
+        print("Local model loaded successfully")
+else:
+    # Load from HuggingFace Hub (default)
+    print(f"Loading model from HuggingFace Hub: {HUGGINGFACE_MODEL_REPO}")
+    from huggingface_hub import hf_hub_download
+    import tensorflow as tf
+    model_file = hf_hub_download(repo_id=HUGGINGFACE_MODEL_REPO, filename="tf_model.h5")
+    with strategy.scope():
+        sentiment_model = create_sentiment_bert(learning_rate=0.000001, SEQ_LEN=32, DROPOUT=0.01, OUTPUT_CNT=1, loss_type='BinaryCrossentropy')
+        # Try load_weights with by_name and skip_mismatch
+        try:
+            sentiment_model.load_weights(model_file, by_name=True, skip_mismatch=True)
+            print("HuggingFace model loaded successfully (with by_name=True)")
+        except Exception as e:
+            print(f"Failed to load with by_name, trying direct load_model: {e}")
+            # If that fails, try loading the full model
+            sentiment_model = tf.keras.models.load_model(model_file, compile=False)
+            print("HuggingFace model loaded successfully (load_model)")
+
+# Initialize tokenizer using huggingface_hub
+print("Initializing tokenizer...")
+from huggingface_hub import hf_hub_download
+vocab_file = hf_hub_download(repo_id="monologg/kobert", filename="tokenizer_78b3253a26.model")
+vocab_txt = hf_hub_download(repo_id="monologg/kobert", filename="vocab.txt")
+tokenizer = KoBertTokenizer(vocab_file=vocab_file, vocab_txt=vocab_txt)
+print(f"Tokenizer type: {type(tokenizer)}")
+print(f"Tokenizer initialized successfully")
+
 mod = sys.modules[__name__]
 
 
 def sentence_convert_data(data):
     SEQ_LEN = 32
     tokens, masks, segments = [], [], []
-    token = tokenizer.encode(data, max_length=SEQ_LEN, pad_to_max_length=True)
+    token = tokenizer.encode(data, max_length=SEQ_LEN, padding='max_length', truncation=True)
 
     num_zeros = token.count(0)
     mask = [1] * (SEQ_LEN - num_zeros) + [0] * num_zeros
@@ -124,16 +166,25 @@ class ModelApi(Resource):
 
 #Error handling
 @app.errorhandler(404)
-def not_found(message): return make_response(message, 404)
+def not_found(message):
+    print(f"404 Error: {message}")
+    return make_response(message, 404)
 
 
 @app.errorhandler(400)
-def bad_request(message): return make_response(message, 400)
+def bad_request(message):
+    print(f"400 Error: {message}")
+    return make_response(message, 400)
 
 
 @app.errorhandler(Exception)
-def internal_error(arg):
-    return make_response(traceback.format_exc(), 500)
+def internal_error(error):
+    error_traceback = traceback.format_exc()
+    print("=" * 80)
+    print("ERROR OCCURRED:")
+    print(error_traceback)
+    print("=" * 80)
+    return make_response(error_traceback, 500)
 
 
 # Run api (main)

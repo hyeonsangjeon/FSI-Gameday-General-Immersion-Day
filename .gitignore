@@ -8,7 +8,12 @@ javadocs/*
 logs/
 .idea
 __pycache__/
-
+data/
+.vscode/
+.claude/
+.venv/
+C*
+log_*
 # IntelliJ IDEA
 **/.idea
 *.iml

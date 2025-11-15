@@ -1,5 +1,5 @@
 import tensorflow as tf
-from transformers import *
+from transformers import TFBertModel, PreTrainedTokenizer
 import json
 import numpy as np
 import pandas as pd
@@ -47,10 +47,10 @@ def sentence_convert_data(data):
     global tokenizer
     SEQ_LEN = 32
     tokens, masks, segments = [], [], []
-    token = tokenizer.encode(data, max_length=SEQ_LEN, pad_to_max_length=True)
-    
-    num_zeros = token.count(0) 
-    mask = [1]*(SEQ_LEN-num_zeros) + [0]*num_zeros 
+    token = tokenizer.encode(data, max_length=SEQ_LEN, padding='max_length', truncation=True)
+
+    num_zeros = token.count(0)
+    mask = [1]*(SEQ_LEN-num_zeros) + [0]*num_zeros
     segment = [0]*SEQ_LEN
 
     tokens.append(token)
@@ -100,12 +100,12 @@ def jhspredic_result(test, sentiment_model, cat_dicts):
 
 def sentence_convert_data(data):
     global tokenizer
-    
+
     tokens, masks, segments = [], [], []
-    token = tokenizer.encode(data, max_length=SEQ_LEN, pad_to_max_length=True)
-    
-    num_zeros = token.count(0) 
-    mask = [1]*(SEQ_LEN-num_zeros) + [0]*num_zeros 
+    token = tokenizer.encode(data, max_length=SEQ_LEN, padding='max_length', truncation=True)
+
+    num_zeros = token.count(0)
+    mask = [1]*(SEQ_LEN-num_zeros) + [0]*num_zeros
     segment = [0]*SEQ_LEN
 
     tokens.append(token)
@@ -175,10 +175,10 @@ def mean_answer_label(*preds):
 def predict_convert_data(data_df):
     global tokenizer
     tokens, masks, segments = [], [], []
-    
+
     for i in tqdm(range(len(data_df))):
 
-        token = tokenizer.encode(data_df[DATA_COLUMN][i], max_length=SEQ_LEN, pad_to_max_length=True, truncation=True)
+        token = tokenizer.encode(data_df[DATA_COLUMN][i], max_length=SEQ_LEN, padding='max_length', truncation=True)
         num_zeros = token.count(0)
         mask = [1]*(SEQ_LEN-num_zeros) + [0]*num_zeros
         segment = [0]*SEQ_LEN
@@ -228,20 +228,20 @@ def dfJHSSentanceInspect(_column):
 
 def convert_data(data_df):
     global tokenizer
-    
+
     SEQ_LEN = G_SEQ_LEN #SEQ_LEN : 버트에 들어갈 인풋의 길이
     print('convert_data SEQ_LEN : ', SEQ_LEN)
     tokens, masks, segments, targets = [], [], [], []
-    
+
     for i in tqdm(range(len(data_df))):
-        # token : 문장을 토큰화함        
-        #token = tokenizer.encode(data_df[DATA_COLUMN][i], max_length=SEQ_LEN, pad_to_max_length=True)
-        token = tokenizer.encode(data_df[DATA_COLUMN][i], max_length=SEQ_LEN, pad_to_max_length=True, truncation=False)
-       
+        # token : 문장을 토큰화함
+        #token = tokenizer.encode(data_df[DATA_COLUMN][i], max_length=SEQ_LEN, padding='max_length', truncation=True)
+        token = tokenizer.encode(data_df[DATA_COLUMN][i], max_length=SEQ_LEN, padding='max_length', truncation=True)
+
         # 마스크는 토큰화한 문장에서 패딩이 아닌 부분은 1, 패딩인 부분은 0으로 통일
         num_zeros = token.count(0)
         mask = [1]*(SEQ_LEN-num_zeros) + [0]*num_zeros
-        
+
         # 문장의 전후관계를 구분해주는 세그먼트는 문장이 1개밖에 없으므로 모두 0
         segment = [0]*SEQ_LEN
 
@@ -249,11 +249,11 @@ def convert_data(data_df):
         tokens.append(token)
         masks.append(mask)
         segments.append(segment)
-        
+
         # 정답(긍정 : 1 부정 0)을 targets 변수에 저장해 줌
         targets.append(data_df[LABEL_COLUMN][i])
 
-    # tokens, masks, segments, 정답 변수 targets를 numpy array로 지정    
+    # tokens, masks, segments, 정답 변수 targets를 numpy array로 지정
     tokens = np.array(tokens)
     masks = np.array(masks)
     segments = np.array(segments)
@@ -316,14 +316,14 @@ def shuffle(df, n=1, axis=0):
 
 def create_sentiment_bert(learning_rate=0.000001, SEQ_LEN=32, DROPOUT=0.01, OUTPUT_CNT=12, loss_type='BinaryCrossentropy'):
     # 버트 pretrained 모델 로드
-    opt = optimizers.Adam(lr=learning_rate)
+    opt = optimizers.Adam(learning_rate=learning_rate)
     model = TFBertModel.from_pretrained("monologg/kobert", from_pt=True)
     # 토큰 인풋, 마스크 인풋, 세그먼트 인풋 정의
     token_inputs = tf.keras.layers.Input((SEQ_LEN,), dtype=tf.int32, name='input_word_ids')
     mask_inputs = tf.keras.layers.Input((SEQ_LEN,), dtype=tf.int32, name='input_masks')
     segment_inputs = tf.keras.layers.Input((SEQ_LEN,), dtype=tf.int32, name='input_segment')
     # 인풋이 [토큰, 마스크, 세그먼트]인 모델 정의
-    bert_outputs = model([token_inputs, mask_inputs, segment_inputs])
+    bert_outputs = model(input_ids=token_inputs, attention_mask=mask_inputs, token_type_ids=segment_inputs)
     bert_outputs = bert_outputs[1]
     sentiment_drop = tf.keras.layers.Dropout(DROPOUT)(bert_outputs)
 
@@ -356,8 +356,6 @@ import logging
 import os
 import unicodedata
 from shutil import copyfile
-
-from transformers import PreTrainedTokenizer
 
 
 logger = logging.getLogger(__name__)
@@ -416,6 +414,15 @@ class KoBertTokenizer(PreTrainedTokenizer):
             cls_token="[CLS]",
             mask_token="[MASK]",
             **kwargs):
+        # Build vocab FIRST before calling super().__init__
+        self.token2idx = dict()
+        self.idx2token = []
+        with open(vocab_txt, 'r', encoding='utf-8') as f:
+            for idx, token in enumerate(f):
+                token = token.strip()
+                self.token2idx[token] = idx
+                self.idx2token.append(token)
+
         super().__init__(
             unk_token=unk_token,
             sep_token=sep_token,
@@ -424,15 +431,6 @@ class KoBertTokenizer(PreTrainedTokenizer):
             mask_token=mask_token,
             **kwargs
         )
-
-        # Build vocab
-        self.token2idx = dict()
-        self.idx2token = []
-        with open(vocab_txt, 'r', encoding='utf-8') as f:
-            for idx, token in enumerate(f):
-                token = token.strip()
-                self.token2idx[token] = idx
-                self.idx2token.append(token)
 
         #self.max_len_single_sentence = self.max_len - 2  # take into account special tokens
         #self.max_len_sentences_pair = self.max_len - 3  # take into account special tokens
@@ -455,6 +453,9 @@ class KoBertTokenizer(PreTrainedTokenizer):
     @property
     def vocab_size(self):
         return len(self.idx2token)
+
+    def get_vocab(self):
+        return self.token2idx.copy()
 
     def __getstate__(self):
         state = self.__dict__.copy()
@@ -608,4 +609,5 @@ class KoBertTokenizer(PreTrainedTokenizer):
 
         return out_vocab_model, out_vocab_txt
 
-tokenizer = KoBertTokenizer.from_pretrained('monologg/kobert')
+# Initialize tokenizer - will be done in the main script
+tokenizer = None
