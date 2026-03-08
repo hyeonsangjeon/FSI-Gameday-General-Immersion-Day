@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KoBERT Sentiment Analysis</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'media',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['"Pretendard"', 'system-ui', 'sans-serif'] },
+        },
+      },
+    };
+  </script>
+  <style>
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+    .spinner { border: 3px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; width: 20px; height: 20px; animation: spin .6s linear infinite; display: inline-block; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 text-gray-900 dark:text-gray-100 transition-colors">
+
+  <div class="max-w-2xl mx-auto px-4 py-12 flex flex-col min-h-screen">
+
+    <!-- Header -->
+    <header class="text-center mb-10">
+      <h1 class="text-3xl sm:text-4xl font-bold tracking-tight">
+        🇰🇷 KoBERT Sentiment Analysis
+      </h1>
+      <p class="mt-2 text-gray-500 dark:text-gray-400 text-sm">한국어 문장의 감정을 분석합니다 (긍정 / 부정)</p>
+    </header>
+
+    <!-- Input -->
+    <main class="flex-1">
+      <form id="form" class="space-y-4">
+        <textarea
+          id="input"
+          name="input_data"
+          rows="4"
+          class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none placeholder-gray-400 dark:placeholder-gray-500"
+          placeholder="한국어 문장을 입력하세요..."
+        ></textarea>
+
+        <!-- Example buttons -->
+        <div class="flex flex-wrap gap-2">
+          <button type="button" class="example-btn px-3 py-1.5 text-xs rounded-full border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition">오늘 날씨가 정말 좋아서 기분이 좋습니다</button>
+          <button type="button" class="example-btn px-3 py-1.5 text-xs rounded-full border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition">서비스가 너무 느려서 화가 납니다</button>
+          <button type="button" class="example-btn px-3 py-1.5 text-xs rounded-full border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition">이 영화 진짜 재미있다</button>
+          <button type="button" class="example-btn px-3 py-1.5 text-xs rounded-full border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition">배송이 너무 늦어서 실망입니다</button>
+        </div>
+
+        <button
+          id="submit-btn"
+          type="submit"
+          class="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-base transition disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          분석하기
+        </button>
+      </form>
+
+      <!-- Result -->
+      <div id="result" class="mt-8 hidden">
+        <div id="result-card" class="rounded-2xl p-6 shadow-lg transition-colors">
+          <div class="flex items-center justify-between mb-4">
+            <span id="sentiment-label" class="text-2xl font-bold"></span>
+            <span id="confidence-text" class="text-lg font-mono"></span>
+          </div>
+          <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-4 overflow-hidden">
+            <div id="confidence-bar" class="h-full rounded-full transition-all duration-700 ease-out" style="width:0%"></div>
+          </div>
+          <p id="raw-score" class="mt-3 text-xs text-gray-500 dark:text-gray-400"></p>
+          <p id="input-echo" class="mt-2 text-sm text-gray-600 dark:text-gray-300 italic break-words"></p>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-12 text-center text-xs text-gray-400 dark:text-gray-500 space-x-3">
+      <span>Powered by KoBERT</span>
+      <a href="https://github.com/hyeonsangjeon/FSI-Gameday-General-Immersion-Day" target="_blank" rel="noopener" class="underline hover:text-gray-600 dark:hover:text-gray-300">GitHub</a>
+      <a href="/docs" class="underline hover:text-gray-600 dark:hover:text-gray-300">API Docs</a>
+    </footer>
+  </div>
+
+  <script>
+    const form = document.getElementById('form');
+    const input = document.getElementById('input');
+    const submitBtn = document.getElementById('submit-btn');
+    const resultDiv = document.getElementById('result');
+    const resultCard = document.getElementById('result-card');
+    const sentimentLabel = document.getElementById('sentiment-label');
+    const confidenceText = document.getElementById('confidence-text');
+    const confidenceBar = document.getElementById('confidence-bar');
+    const rawScore = document.getElementById('raw-score');
+    const inputEcho = document.getElementById('input-echo');
+
+    // Example buttons
+    document.querySelectorAll('.example-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        input.value = btn.textContent;
+        input.focus();
+      });
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+
+      // Loading state
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner"></span> 분석 중...';
+      resultDiv.classList.add('hidden');
+
+      try {
+        const fd = new FormData();
+        fd.append('input_data', text);
+
+        const res = await fetch('/predict', { method: 'POST', body: fd });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        const positive = data.sentiment === '긍정';
+        const conf = data.confidence;
+
+        // Colors
+        resultCard.className = positive
+          ? 'rounded-2xl p-6 shadow-lg bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700'
+          : 'rounded-2xl p-6 shadow-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700';
+
+        sentimentLabel.textContent = positive ? '😊 긍정' : '😞 부정';
+        sentimentLabel.className = positive
+          ? 'text-2xl font-bold text-emerald-600 dark:text-emerald-400'
+          : 'text-2xl font-bold text-red-600 dark:text-red-400';
+
+        confidenceText.textContent = conf.toFixed(2) + '%';
+
+        confidenceBar.style.width = '0%';
+        confidenceBar.className = positive
+          ? 'h-full rounded-full transition-all duration-700 ease-out bg-emerald-500'
+          : 'h-full rounded-full transition-all duration-700 ease-out bg-red-500';
+        requestAnimationFrame(() => {
+          confidenceBar.style.width = conf + '%';
+        });
+
+        rawScore.textContent = 'raw score: ' + data.raw_score;
+        inputEcho.textContent = '\"' + data.text + '\"';
+
+        resultDiv.classList.remove('hidden');
+      } catch (err) {
+        alert('요청 실패: ' + err.message);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '분석하기';
+      }
+    });
+  </script>
+</body>
+</html>

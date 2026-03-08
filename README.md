@@ -1,95 +1,69 @@
-# Korean Sentiment Analysis API
+# KoBERT Sentiment Analysis
 
-TensorFlow BERT 기반 한국어 감정 분석 REST API 서비스입니다. Flask로 구현되었으며 Docker 컨테이너로 배포됩니다.
-
-## 주요 기능
-
-- **한국어 감정 분석**: KoBERT 모델을 사용한 긍정/부정 이진 분류
-- **REST API**: Flask-RESTX 기반 Swagger UI 제공
-- **유연한 모델 로딩**: HuggingFace Hub 또는 로컬 파일에서 모델 로드
-- **자동 GPU/CPU 선택**: 실행 환경에 따라 자동으로 최적 디바이스 선택
-- **Docker 배포**: 컨테이너화된 배포로 일관된 실행 환경 제공
+한국어 문장 감정 분석 (긍정/부정) 서비스. KoBERT 기반 이진 분류기를 FastAPI로 서빙합니다.
 
 ![Architecture](https://github.com/hyeonsangjeon/FSI-Gameday-General-Immersion-Day/blob/main/pic/simple_architecture.png?raw=true)
 
-## 기술 스택
+## Quick Start
 
-### Core Framework
-- **TensorFlow 2.20.0**: 딥러닝 프레임워크
-- **Transformers 4.57.1**: HuggingFace 트랜스포머 라이브러리
-- **Flask 2.2.5**: 웹 프레임워크
-- **Flask-RESTX**: REST API 및 Swagger 문서화
-
-### Model
-- **Base Model**: KoBERT (monologg/kobert) - 한국어 BERT 사전학습 모델
-- **Task**: Binary Sentiment Classification (긍정/부정)
-- **Sequence Length**: 32 tokens
-- **Tokenizer**: SentencePiece 기반 KoBertTokenizer
-
-## 빠른 시작
-
-### 사전 요구사항
-
-- Docker 설치
-- (선택사항) NVIDIA GPU 및 CUDA 지원 (GPU 가속용)
-- 최소 16GB RAM 권장
-
-### Docker로 실행
-
-#### 1. 저장소 복제
-```bash
-git clone https://github.com/hyeonsangjeon/FSI-Gameday-General-Immersion-Day.git
-cd FSI-Gameday-General-Immersion-Day
-```
-
-#### 2. Docker 이미지 빌드
-```bash
-docker build -t sentiment-api .
-```
-
-#### 3. 컨테이너 실행
-
-**HuggingFace Hub에서 모델 로드 (기본값)**:
-```bash
-docker run --name model-api -p 8080:5000 sentiment-api
-```
-
-**로컬 모델 파일 사용**:
-```bash
-docker run --name model-api -p 8080:5000 \
-  -v $(pwd)/data:/app/data \
-  -e USE_LOCAL_MODEL=true \
-  sentiment-api
-```
-
-**GPU 사용**:
-```bash
-docker run --name model-api -p 8080:5000 --gpus all sentiment-api
-```
-
-#### 4. API 접근
-
-브라우저에서 Swagger UI 열기:
-```
-http://localhost:8080/
-```
-
-## API 사용법
-
-### Swagger UI
-
-브라우저에서 `http://localhost:8080/`에 접속하면 대화형 API 문서를 확인할 수 있습니다.
-
-### cURL 예제
+### Docker (권장)
 
 ```bash
-# 긍정 문장 분석
-curl -X POST "http://localhost:8080/Korean%20sentiment%20analysis" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "input_data=오늘 정말 행복한 하루였어요"
+docker build -t kobert-sentiment .
+docker run -p 5000:5000 kobert-sentiment
+```
 
-# 응답 예시
-"긍정적인 문장입니다. 긍정 확률 : [ 93.22% ]"
+→ http://localhost:5000
+
+GPU 사용:
+```bash
+docker run -p 5000:5000 --gpus all kobert-sentiment
+```
+
+### Local
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python app.py
+```
+
+→ http://localhost:5000
+
+## API
+
+### POST /predict
+
+한국어 문장의 감정을 분석합니다.
+
+**Request** (form data):
+```bash
+curl -X POST http://localhost:5000/predict -d "input_data=오늘 기분이 좋다"
+```
+
+**Response**:
+```json
+{
+  "text": "오늘 기분이 좋다",
+  "sentiment": "긍정",
+  "confidence": 92.34,
+  "raw_score": 0.9234
+}
+```
+
+### GET /docs
+
+Swagger UI (FastAPI 자동 생성)
+
+### GET /health
+
+서버 상태 확인:
+```json
+{
+  "status": "ok",
+  "model_loaded": true
+}
 ```
 
 ### Python 예제
@@ -97,227 +71,91 @@ curl -X POST "http://localhost:8080/Korean%20sentiment%20analysis" \
 ```python
 import requests
 
-url = "http://localhost:8080/Korean%20sentiment%20analysis"
-data = {"input_data": "오늘 정말 행복한 하루였어요"}
-
-response = requests.post(url, data=data)
+response = requests.post(
+    "http://localhost:5000/predict",
+    data={"input_data": "오늘 정말 행복한 하루였어요"},
+)
 print(response.json())
 ```
 
 ### JavaScript 예제
 
 ```javascript
-const url = 'http://localhost:8080/Korean%20sentiment%20analysis';
-const data = new URLSearchParams({ input_data: '오늘 정말 행복한 하루였어요' });
+const fd = new FormData();
+fd.append("input_data", "오늘 정말 행복한 하루였어요");
 
-fetch(url, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-  body: data
-})
-  .then(response => response.json())
-  .then(result => console.log(result));
+const res = await fetch("http://localhost:5000/predict", {
+  method: "POST",
+  body: fd,
+});
+console.log(await res.json());
 ```
 
-## 모델 로딩 옵션
+## Architecture
 
-### HuggingFace Hub (기본값)
+- **Framework**: FastAPI + Uvicorn
+- **Model**: KoBERT fine-tuned for binary sentiment classification
+- **Model Source**: [HuggingFace Hub](https://huggingface.co/HyeonSang/kobert-sentiment) (`HyeonSang/kobert-sentiment`)
+- **Tokenizer**: SentencePiece (KoBertTokenizer)
+- **Deep Learning**: TensorFlow 2.x
+- **GPU/CPU**: Docker 환경에서 자동 GPU 감지, 로컬에서는 기본 전략 사용
 
-환경변수 설정 없이 실행하면 자동으로 HuggingFace Hub에서 모델을 다운로드합니다.
-
-- **Repository**: `HyeonSang/kobert-sentiment`
-- **Model File**: `tf_model.h5`
-- **장점**: 별도의 모델 파일 관리 불필요, 자동 다운로드
-
-```bash
-docker run --name model-api -p 8080:5000 sentiment-api
+```
+Client → FastAPI (app.py)
+              │
+              ▼
+        SentimentPredictor (model.py)
+              │
+         ┌────┴────┐
+         ▼         ▼
+  KoBertTokenizer  TFBertModel + Dense
+  (tokenizer.py)   (BertConfig → load_weights)
 ```
 
-### 로컬 파일
+## Project Structure
 
-로컬에 저장된 모델 파일을 사용하려면 환경변수를 설정합니다.
-
-- **Path**: `./data/fsi_comment_sentiment_model.h5`
-- **장점**: 오프라인 환경에서 사용 가능, 커스텀 모델 사용 가능
-
-```bash
-docker run --name model-api -p 8080:5000 \
-  -v $(pwd)/data:/app/data \
-  -e USE_LOCAL_MODEL=true \
-  sentiment-api
+```
+├── app.py                  # FastAPI 진입점
+├── model.py                # SentimentPredictor 클래스 (모델 로딩 + 추론)
+├── tokenizer.py            # KoBertTokenizer 클래스
+├── static/
+│   └── index.html          # Tailwind CSS 기반 웹 UI
+├── Dockerfile              # uvicorn CMD
+├── requirements.txt        # Python 패키지 (8개)
+├── .gitignore
+├── README.md
+├── CLAUDE.md
+└── LICENSE                 # MIT
 ```
 
-## 로컬 개발
+## 권장 사양
 
-### Python 환경 설정
-
-```bash
-# 가상환경 생성
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-
-# 의존성 설치
-pip install -r requirements.txt
-
-# 애플리케이션 실행
-python happy_emotional_flask.py
-```
-
-### 주요 파일
-
-- `happy_emotional_flask.py`: Flask REST API 서버
-- `hsjeon_datascience_nlp.py`: NLP 유틸리티 및 KoBertTokenizer
-- `requirements.txt`: Python 패키지 의존성
-- `Dockerfile`: Docker 이미지 정의
-- `get_ready.sh`: 배포용 스크립트 (EC2)
-- `install_back.sh`: Docker 설치 스크립트 (Amazon Linux 2)
-
-## Docker 관리
-
-### 컨테이너 로그 확인
-```bash
-docker logs -f model-api
-```
-
-### 컨테이너 중지
-```bash
-docker stop model-api
-```
-
-### 컨테이너 삭제
-```bash
-docker rm model-api
-```
-
-### 이미지 삭제
-```bash
-docker rmi sentiment-api
-```
-
-## 성능 최적화
-
-### GPU 가속
-
-NVIDIA GPU가 있는 경우 자동으로 감지하여 사용합니다:
-
-```bash
-docker run --name model-api -p 8080:5000 --gpus all sentiment-api
-```
-
-Docker 내부에서 `/app` 디렉토리가 존재하면 자동으로 GPU 모드로 전환됩니다.
-
-### 권장 사양
-
-- **CPU**: 최소 4 vCPU (t2.xlarge 이상)
+- **CPU**: 4 vCPU 이상
 - **메모리**: 16GB RAM
-- **스토리지**: 50GB (Docker 이미지 크기: ~7GB)
-- **GPU** (선택사항): NVIDIA GPU with CUDA support
-
-## 에러 처리
-
-애플리케이션은 다음과 같은 에러 핸들링을 제공합니다:
-
-- **404 Not Found**: 잘못된 엔드포인트 접근
-- **400 Bad Request**: 잘못된 요청 파라미터
-- **500 Internal Server Error**: 서버 내부 오류 (전체 traceback 반환)
-
-모든 에러는 터미널 로그와 `./log_data.log` 파일에 기록됩니다.
-
-## EC2 배포
-
-Amazon Linux 2에서 배포하는 경우:
-
-### 1. Docker 설치
-```bash
-git clone https://github.com/hyeonsangjeon/FSI-Gameday-General-Immersion-Day.git
-cd FSI-Gameday-General-Immersion-Day
-chmod u+x ./*.sh
-./install_back.sh
-# 터미널 재접속 필요
-```
-
-### 2. API 실행
-```bash
-./get_ready.sh
-```
-
-### 3. 보안 그룹 설정
-- 인바운드 규칙에 TCP 8080 포트 추가
-- 소스: 사용자 IP 또는 필요한 IP 범위
-
-### 4. API 접근
-```
-http://{EC2_PUBLIC_IP}:8080/
-```
-
-## 아키텍처
-
-```
-┌─────────────┐
-│   Client    │
-└──────┬──────┘
-       │ HTTP POST
-       │ /Korean sentiment analysis
-       ▼
-┌─────────────────────────────┐
-│   Flask REST API            │
-│   (happy_emotional_flask.py)│
-└──────────┬──────────────────┘
-           │
-           ▼
-┌─────────────────────────────┐
-│   Text Processing           │
-│   (KoBertTokenizer)         │
-└──────────┬──────────────────┘
-           │
-           ▼
-┌─────────────────────────────┐
-│   BERT Model                │
-│   (TFBertModel + Dense)     │
-└──────────┬──────────────────┘
-           │
-           ▼
-┌─────────────────────────────┐
-│   Sentiment Prediction      │
-│   (Positive/Negative)       │
-└─────────────────────────────┘
-```
-
-## 라이선스
-
-이 프로젝트는 교육 및 연구 목적으로 제공됩니다.
+- **스토리지**: 50GB (Docker 이미지 포함)
+- **GPU** (선택): NVIDIA GPU + CUDA
 
 ## 문제 해결
 
-### 메모리 부족 에러
-- Docker에 할당된 메모리를 16GB 이상으로 증가
-- 불필요한 컨테이너 및 이미지 삭제
+### 메모리 부족
+Docker에 할당된 메모리를 16GB 이상으로 증가시키세요.
 
 ### 모델 로딩 실패
-- 인터넷 연결 확인 (HuggingFace Hub 사용 시)
-- 로컬 모델 파일 경로 확인
-- Docker 볼륨 마운트 확인
+인터넷 연결을 확인하세요. 첫 실행 시 HuggingFace Hub에서 모델을 다운로드합니다 (~370MB).
 
 ### 포트 충돌
 ```bash
-# 8080 포트 사용 중인 프로세스 확인
-lsof -i :8080
-# 다른 포트 사용
-docker run --name model-api -p 9090:5000 sentiment-api
+lsof -i :5000
+docker run -p 8080:5000 kobert-sentiment  # 다른 포트 사용
 ```
 
-## 기여
+## License
 
-이슈 및 PR은 언제나 환영합니다.
+[MIT](LICENSE)
 
 ## 참고 자료
 
 - [KoBERT](https://github.com/SKTBrain/KoBERT)
 - [HuggingFace Transformers](https://huggingface.co/docs/transformers)
-- [Flask-RESTX](https://flask-restx.readthedocs.io/)
+- [FastAPI](https://fastapi.tiangolo.com/)
 - [TensorFlow](https://www.tensorflow.org/)
-
-## 워크샵 자료
-
-AWS FSI General Immersion Day 워크샵 자료는 다음 링크에서 확인할 수 있습니다:
-- [Workshop Guide](https://catalog.us-east-1.prod.workshops.aws/workshops/f3a3e2bd-e1d5-49de-b8e6-dac361842e76/ko-KR/preparation-guide/20-event-engine)
